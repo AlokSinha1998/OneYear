@@ -17,6 +17,7 @@ import Animated, {
     useAnimatedStyle,
     withRepeat,
     withTiming,
+    Easing,
 } from "react-native-reanimated";
 import LinearGradient from "react-native-linear-gradient";
 import DayProgressBar from "./component/module/DayProgressBar";
@@ -81,6 +82,10 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
     const isPast = todayIndex && index < todayIndex;
     const isFuture = todayIndex && index > todayIndex;
 
+    // Continuous dropping animation - like water drops
+    const dropY = useSharedValue<number>(0);
+    const dropOpacity = useSharedValue<number>(0);
+
     // Bubble animations - create 3 bubbles with different animations
     const bubble1Scale = useSharedValue<number>(0);
     const bubble1Opacity = useSharedValue<number>(0);
@@ -90,6 +95,30 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
     const bubble3Opacity = useSharedValue<number>(0);
 
     useEffect(() => {
+        // Continuous dropping effect - staggered delay based on index
+        const initialDelay = (index % 30) * 100; // Stagger start times
+
+        setTimeout(() => {
+            // Infinite loop for continuous dripping
+            dropY.value = withRepeat(
+                withTiming(size * 2, {
+                    duration: 1000,
+                    easing: Easing.in(Easing.quad),
+                }),
+                -1,
+                false
+            );
+
+            dropOpacity.value = withRepeat(
+                withTiming(0, {
+                    duration: 1000,
+                    easing: Easing.out(Easing.ease),
+                }),
+                -1,
+                false
+            );
+        }, initialDelay);
+
         if (isToday) {
             pulse.value = withRepeat(
                 withTiming(1.15, { duration: 1500 }),
@@ -141,6 +170,11 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: isToday ? pulse.value : 1 }],
+    }));
+
+    const dropStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: dropY.value }],
+        opacity: 1 - dropOpacity.value,
     }));
 
     const bubble1Style = useAnimatedStyle(() => ({
@@ -287,6 +321,22 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
                     </Text>
                 </LinearGradient>
             </Animated.View>
+
+            {/* Continuous Water Droplet */}
+            <Animated.View
+                style={[
+                    {
+                        position: 'absolute',
+                        bottom: -size * 0.2,
+                        left: size / 2 - size * 0.15,
+                        width: size * 0.3,
+                        height: size * 0.3,
+                        borderRadius: size * 0.15,
+                        backgroundColor: gradientColors[0],
+                    },
+                    dropStyle,
+                ]}
+            />
         </View>
     );
 };
