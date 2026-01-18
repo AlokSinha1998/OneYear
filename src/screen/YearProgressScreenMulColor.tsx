@@ -3,7 +3,7 @@ import {
     View,
     Text,
     StyleSheet,
-    FlatList,
+    ScrollView,
     TouchableOpacity,
     AppState,
     AppStateStatus,
@@ -176,8 +176,10 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
             ['#6366F1', '#4F46E5'], // Indigo variant
         ];
 
-        // Use modulo to cycle through colors
-        return colorPalette[dayIndex % colorPalette.length];
+        // Use a pseudo-random distribution based on day index to avoid repetitive patterns
+        // This creates better color variety across rows and columns
+        const hash = (dayIndex * 7 + Math.floor(dayIndex / 3) * 5) % colorPalette.length;
+        return colorPalette[hash];
     };
 
     // Define gradient colors based on state
@@ -304,9 +306,11 @@ const YearProgressScreenMulColor: React.FC = () => {
 
     /* -------- Responsive layout math -------- */
 
-    const headerHeight = 180; // Increased to account for date, progress, and DayProgressBar
-    const availableWidth = width - 40; // Horizontal padding for better spacing
-    const availableHeight = height - headerHeight - 40; // Vertical padding
+    // Reduced header height since paddingTop was removed
+    // Header includes: menu button area (~60px) + date text (~35px) + progress text (~25px) + DayProgressBar (~30px) = ~150px
+    const headerHeight = 150;
+    const availableWidth = width - 32; // Reduced horizontal padding
+    const availableHeight = height - headerHeight - 20; // Minimal bottom padding to fill screen
 
     const { columns, dotSize } = React.useMemo(() => {
         let bestCols = 10;
@@ -328,10 +332,7 @@ const YearProgressScreenMulColor: React.FC = () => {
                 bestCols = c;
             }
         }
-
-        // slight reduction to ensure it fits without rounding issues
-        // Minimum dot size of 8 to ensure visibility on very small devices
-        return { columns: bestCols, dotSize: Math.max(8, Math.floor(bestSize * 0.95)) };
+        return { columns: bestCols, dotSize: Math.max(8, Math.floor(bestSize * 1.02)) };
     }, [width, height]);
 
     /* -------- Recalculate when year changes -------- */
@@ -395,22 +396,21 @@ const YearProgressScreenMulColor: React.FC = () => {
             )}
             <DayProgressBar />
 
-            <FlatList<number>
-                key={columns}
-                data={Array.from({ length: data.totalDays }, (_, i) => i + 1)}
-                keyExtractor={(item) => item.toString()}
-                numColumns={columns}
-                scrollEnabled={true}
+            <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.grid}
-                renderItem={({ item }) => (
-                    <DayDot
-                        index={item}
-                        todayIndex={data.todayIndex}
-                        size={dotSize}
-                    />
-                )}
-            />
+            >
+                <View style={styles.dotsContainer}>
+                    {Array.from({ length: data.totalDays }, (_, i) => i + 1).map((item) => (
+                        <DayDot
+                            key={item}
+                            index={item}
+                            todayIndex={data.todayIndex}
+                            size={dotSize}
+                        />
+                    ))}
+                </View>
+            </ScrollView>
 
             {/* Modal for "More Apps" */}
             <Modal
@@ -505,11 +505,11 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#000",
         alignItems: "center",
-        paddingTop: 40,
+        // paddingTop: 40,
     },
     menuButton: {
         position: 'absolute',
-        top: 40,
+        // top: 40,
         left: 20,
         zIndex: 10,
         padding: 10,
@@ -530,9 +530,17 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     grid: {
+        flexGrow: 1,
         alignItems: "center",
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: 12,
+        paddingBottom: 10,
+        marginHorizontal: 5,
+    },
+    dotsContainer: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        alignItems: "center",
     },
     controls: {
         backgroundColor: 'pink',
