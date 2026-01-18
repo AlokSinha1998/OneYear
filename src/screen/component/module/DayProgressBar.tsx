@@ -4,7 +4,10 @@ import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withTiming,
+    withRepeat,
+    Easing,
 } from "react-native-reanimated";
+import LinearGradient from "react-native-linear-gradient";
 
 const { width } = Dimensions.get("window");
 const BAR_WIDTH = width * 0.9;
@@ -41,6 +44,8 @@ const generateSafeColor = (): string => {
 
 const DayProgressBar = () => {
     const progress = useSharedValue<number>(0);
+    const shimmerPosition = useSharedValue<number>(-1);
+    const pulseScale = useSharedValue<number>(1);
 
     const [completed, setCompleted] = useState<number>(0);
     const [remaining, setRemaining] = useState<number>(100);
@@ -63,11 +68,40 @@ const DayProgressBar = () => {
         updateProgress();
         const interval = setInterval(updateProgress, 60_000);
 
+        // Start shimmer animation - continuous sliding effect
+        shimmerPosition.value = withRepeat(
+            withTiming(1, {
+                duration: 2000,
+                easing: Easing.linear,
+            }),
+            -1,
+            false
+        );
+
+        // Subtle pulsing effect
+        pulseScale.value = withRepeat(
+            withTiming(1.02, {
+                duration: 1500,
+                easing: Easing.inOut(Easing.ease),
+            }),
+            -1,
+            true
+        );
+
         return () => clearInterval(interval);
     }, []);
 
     const animatedStyle = useAnimatedStyle(() => ({
         width: BAR_WIDTH * progress.value,
+        transform: [{ scaleY: pulseScale.value }],
+    }));
+
+    const shimmerStyle = useAnimatedStyle(() => ({
+        transform: [
+            {
+                translateX: shimmerPosition.value * BAR_WIDTH * 1.5,
+            },
+        ],
     }));
 
     return (
@@ -84,7 +118,35 @@ const DayProgressBar = () => {
 
             {/* BAR */}
             <View style={styles.container}>
-                <Animated.View style={[styles.fill, animatedStyle, { backgroundColor: barColor },]} />
+                <Animated.View style={[styles.fill, animatedStyle]}>
+                    <LinearGradient
+                        colors={[barColor, barColor]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.gradient}
+                    >
+                        {/* Shimmer overlay */}
+                        <Animated.View
+                            style={[
+                                styles.shimmerContainer,
+                                shimmerStyle,
+                            ]}
+                        >
+                            <LinearGradient
+                                colors={[
+                                    'transparent',
+                                    'rgba(255, 255, 255, 0.3)',
+                                    'rgba(255, 255, 255, 0.5)',
+                                    'rgba(255, 255, 255, 0.3)',
+                                    'transparent',
+                                ]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.shimmer}
+                            />
+                        </Animated.View>
+                    </LinearGradient>
+                </Animated.View>
             </View>
         </View>
     );
@@ -120,6 +182,22 @@ const styles = StyleSheet.create({
     },
     fill: {
         height: "100%",
-        backgroundColor: "#00ff99",
+    },
+    gradient: {
+        flex: 1,
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+    },
+    shimmerContainer: {
+        position: "absolute",
+        top: 0,
+        left: -BAR_WIDTH * 0.5,
+        width: BAR_WIDTH * 0.5,
+        height: "100%",
+    },
+    shimmer: {
+        width: "100%",
+        height: "100%",
     },
 });

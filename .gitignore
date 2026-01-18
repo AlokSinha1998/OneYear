@@ -36,6 +36,10 @@ local.properties
 *.aab
 .kotlin/
 
+# Android app directory (build artifacts, generated files)
+android/app/build/
+android/app/.cxx/
+
 # node.js
 #
 node_modules/

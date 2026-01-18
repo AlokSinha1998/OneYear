@@ -81,6 +81,14 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
     const isPast = todayIndex && index < todayIndex;
     const isFuture = todayIndex && index > todayIndex;
 
+    // Bubble animations - create 3 bubbles with different animations
+    const bubble1Scale = useSharedValue<number>(0);
+    const bubble1Opacity = useSharedValue<number>(0);
+    const bubble2Scale = useSharedValue<number>(0);
+    const bubble2Opacity = useSharedValue<number>(0);
+    const bubble3Scale = useSharedValue<number>(0);
+    const bubble3Opacity = useSharedValue<number>(0);
+
     useEffect(() => {
         if (isToday) {
             pulse.value = withRepeat(
@@ -88,11 +96,66 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
                 -1,
                 true
             );
+
+            // Bubble 1 - grows and fades out
+            bubble1Scale.value = withRepeat(
+                withTiming(2, { duration: 2000 }),
+                -1,
+                false
+            );
+            bubble1Opacity.value = withRepeat(
+                withTiming(0, { duration: 2000 }),
+                -1,
+                false
+            );
+
+            // Bubble 2 - delayed animation
+            setTimeout(() => {
+                bubble2Scale.value = withRepeat(
+                    withTiming(2.2, { duration: 2500 }),
+                    -1,
+                    false
+                );
+                bubble2Opacity.value = withRepeat(
+                    withTiming(0, { duration: 2500 }),
+                    -1,
+                    false
+                );
+            }, 700);
+
+            // Bubble 3 - even more delayed
+            setTimeout(() => {
+                bubble3Scale.value = withRepeat(
+                    withTiming(1.8, { duration: 2200 }),
+                    -1,
+                    false
+                );
+                bubble3Opacity.value = withRepeat(
+                    withTiming(0, { duration: 2200 }),
+                    -1,
+                    false
+                );
+            }, 1400);
         }
     }, [isToday]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: isToday ? pulse.value : 1 }],
+    }));
+
+    const bubble1Style = useAnimatedStyle(() => ({
+        transform: [{ scale: bubble1Scale.value }],
+        opacity: 0.6 - bubble1Opacity.value * 0.6,
+    }));
+
+    const bubble2Style = useAnimatedStyle(() => ({
+        transform: [{ scale: bubble2Scale.value }],
+        opacity: 0.5 - bubble2Opacity.value * 0.5,
+    }));
+
+    const bubble3Style = useAnimatedStyle(() => ({
+        transform: [{ scale: bubble3Scale.value }],
+        opacity: 0.4 - bubble3Opacity.value * 0.4,
     }));
 
     // Generate vibrant colors for each day based on index
@@ -123,55 +186,106 @@ const DayDot: React.FC<DayDotProps> = ({ index, todayIndex, size }) => {
         : getColorForDay(index);
 
     return (
-        <Animated.View
-            style={[
-                {
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    margin: size * 0.1,
-                    // Shadow for depth (iOS) - matches gradient color
-                    shadowColor: isToday ? '#F59E0B' : gradientColors[0],
-                    shadowOffset: { width: 0, height: isToday ? 4 : 2 },
-                    shadowOpacity: isToday ? 0.6 : 0.25,
-                    shadowRadius: isToday ? 8 : 4,
-                    // Elevation for Android
-                    elevation: isToday ? 8 : 3,
-                },
-                isToday && animatedStyle,
-            ]}
-        >
-            <LinearGradient
-                colors={gradientColors}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: size / 2,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    opacity: isPast ? 0.75 : isFuture ? 0.4 : 1,
-                    borderWidth: 1,
-                    borderColor: isToday
-                        ? 'rgba(245, 158, 11, 0.5)' // Golden border for today
-                        : 'rgba(255, 255, 255, 0.15)',
-                }}
+        <View style={{ position: 'relative' }}>
+            {/* Animated Bubbles - only for today */}
+            {isToday && (
+                <>
+                    <Animated.View
+                        style={[
+                            {
+                                position: 'absolute',
+                                width: size,
+                                height: size,
+                                borderRadius: size / 2,
+                                backgroundColor: '#FCD34D',
+                                top: 0,
+                                left: 0,
+                            },
+                            bubble1Style,
+                        ]}
+                    />
+                    <Animated.View
+                        style={[
+                            {
+                                position: 'absolute',
+                                width: size,
+                                height: size,
+                                borderRadius: size / 2,
+                                backgroundColor: '#F59E0B',
+                                top: 0,
+                                left: 0,
+                            },
+                            bubble2Style,
+                        ]}
+                    />
+                    <Animated.View
+                        style={[
+                            {
+                                position: 'absolute',
+                                width: size,
+                                height: size,
+                                borderRadius: size / 2,
+                                backgroundColor: '#FBBF24',
+                                top: 0,
+                                left: 0,
+                            },
+                            bubble3Style,
+                        ]}
+                    />
+                </>
+            )}
+
+            {/* Main Dot */}
+            <Animated.View
+                style={[
+                    {
+                        width: size,
+                        height: size,
+                        borderRadius: size / 2,
+                        margin: size * 0.1,
+                        // Shadow for depth (iOS) - matches gradient color
+                        shadowColor: isToday ? '#F59E0B' : gradientColors[0],
+                        shadowOffset: { width: 0, height: isToday ? 4 : 2 },
+                        shadowOpacity: isToday ? 0.6 : 0.25,
+                        shadowRadius: isToday ? 8 : 4,
+                        // Elevation for Android
+                        elevation: isToday ? 8 : 3,
+                    },
+                    isToday && animatedStyle,
+                ]}
             >
-                <Text
+                <LinearGradient
+                    colors={gradientColors}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                     style={{
-                        fontSize: size * 0.35,
-                        color: "#fff",
-                        fontWeight: "700",
-                        textShadowColor: 'rgba(0, 0, 0, 0.5)',
-                        textShadowOffset: { width: 0, height: 1 },
-                        textShadowRadius: 2,
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: size / 2,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        opacity: isPast ? 0.75 : isFuture ? 0.4 : 1,
+                        borderWidth: 1,
+                        borderColor: isToday
+                            ? 'rgba(245, 158, 11, 0.5)' // Golden border for today
+                            : 'rgba(255, 255, 255, 0.15)',
                     }}
                 >
-                    {index}
-                </Text>
-            </LinearGradient>
-        </Animated.View>
+                    <Text
+                        style={{
+                            fontSize: size * 0.35,
+                            color: "#fff",
+                            fontWeight: "700",
+                            textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                            textShadowOffset: { width: 0, height: 1 },
+                            textShadowRadius: 2,
+                        }}
+                    >
+                        {index}
+                    </Text>
+                </LinearGradient>
+            </Animated.View>
+        </View>
     );
 };
 
