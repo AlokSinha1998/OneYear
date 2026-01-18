@@ -33,7 +33,12 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+*.aab
 .kotlin/
+
+# Android app directory (build artifacts, generated files)
+android/app/build/
+android/app/.cxx/
 
 # node.js
 #
