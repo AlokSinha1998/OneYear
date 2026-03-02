@@ -20,6 +20,9 @@ import Animated, {
 } from "react-native-reanimated";
 import LinearGradient from "react-native-linear-gradient";
 import DayProgressBar from "./component/module/DayProgressBar";
+import CircularLoader from "./component/module/AnimatedCircle";
+import ThreeDLoader from "./component/module/ThreeDLoader";
+import ThreeDLoaderWithModal from "./component/module/ThreeDLoaderWithModal";
 
 /* ===================== TYPES ===================== */
 
@@ -332,7 +335,7 @@ const YearProgressScreenMulColor: React.FC = () => {
                 bestCols = c;
             }
         }
-        return { columns: bestCols, dotSize: Math.max(8, Math.floor(bestSize * 1.02)) };
+        return { columns: bestCols, dotSize: Math.max(8, Math.floor(bestSize * 1.90)) };
     }, [width, height]);
 
     /* -------- Recalculate when year changes -------- */
@@ -377,24 +380,30 @@ const YearProgressScreenMulColor: React.FC = () => {
     return (
         <View style={styles.container}>
             {/* Top Left Menu Button */}
-            <TouchableOpacity
-                style={styles.menuButton}
-                onPress={() => setModalVisible(true)}
-            >
-                <Text style={styles.menuIcon}>☰</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: width * 0.95 }}>
+                <TouchableOpacity
+                    style={styles.menuButton}
+                    onPress={() => setModalVisible(true)}
+                >
+                    <Text style={styles.menuIcon}>☰</Text>
+                </TouchableOpacity>
 
-            {/* HEADER */}
-            <Text style={styles.date}>
-                {new Date().toDateString().toUpperCase()}
-            </Text>
+                {/* HEADER */}
+                <View>
+                    <Text style={styles.date}>
+                        {new Date().toDateString().toUpperCase()}
+                    </Text>
 
-            {showPercent && data.todayIndex !== null && (
-                <Text style={styles.progress}>
-                    {data.gonePercent}% gone • {data.leftPercent}% left
-                </Text>
-            )}
+                    {showPercent && data.todayIndex !== null && (
+                        <Text style={styles.progress}>
+                            {data.gonePercent}% gone • {data.leftPercent}% left
+                        </Text>
+                    )}
+                </View>
+                <ThreeDLoaderWithModal />
+            </View>
             <DayProgressBar />
+
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -508,10 +517,10 @@ const styles = StyleSheet.create({
         // paddingTop: 40,
     },
     menuButton: {
-        position: 'absolute',
+        // position: 'absolute',
         // top: 40,
-        left: 20,
-        zIndex: 10,
+        // left: 20,
+        // zIndex: 10,
         padding: 10,
     },
     menuIcon: {
