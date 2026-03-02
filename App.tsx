@@ -1,17 +1,16 @@
-import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
-import YearProgressScreen from './src/screen/YearProgressScreen'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import YearProgressScreenMulColor from './src/screen/YearProgressScreenMulColor'
 import AppNavigation from './src/navigation/stacknavigation/AppNavigation'
+import { ThemeProvider } from './src/context/ThemeContext'
 
 const App = () => {
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-
-      <AppNavigation />
-    </SafeAreaView>
+    <ThemeProvider>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+        <AppNavigation />
+      </SafeAreaView>
+    </ThemeProvider>
   )
 }
 
-export default App  
+export default App
