@@ -44,13 +44,28 @@ const DayStatsModal: React.FC<DayStatsModalProps> = ({
     const daysLeft = totalDays - dayIndex;
     const progressPct = ((dayIndex / totalDays) * 100).toFixed(1);
     const today = new Date();
-    const isCurrentYear = today.getFullYear() === year;
+    const currentYear = today.getFullYear();
+    const isCurrentYear = currentYear === year;
+    const isPastYear = year < currentYear;
+    const isFutureYear = year > currentYear;
+
+    // Calculate todayDayIndex the same way as the main screen's getDayOfYear
     const todayDayIndex = isCurrentYear
-        ? Math.ceil((today.getTime() - new Date(year, 0, 0).getTime()) / 86400000)
+        ? (() => {
+            const start = new Date(year, 0, 0);
+            const diff = today.getTime() - start.getTime() +
+                (start.getTimezoneOffset() - today.getTimezoneOffset()) * 60000;
+            return Math.floor(diff / 86400000);
+        })()
         : null;
+
     const isToday = todayDayIndex !== null && todayDayIndex === dayIndex;
-    const isPast = todayDayIndex !== null && dayIndex < todayDayIndex;
-    const isFuture = todayDayIndex !== null && dayIndex > todayDayIndex;
+    const isPast = isCurrentYear
+        ? (todayDayIndex !== null && dayIndex < todayDayIndex)
+        : isPastYear;
+    const isFuture = isCurrentYear
+        ? (todayDayIndex !== null && dayIndex > todayDayIndex)
+        : isFutureYear;
 
     const weekNumber = Math.ceil(dayIndex / 7);
     const quarter = Math.ceil((date.getMonth() + 1) / 3);

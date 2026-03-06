@@ -25,5 +25,20 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!-- Year Progress Home Screen Widget -->
+      <receiver
+          android:name=".YearProgressWidget"
+          android:exported="true"
+          android:label="Year Progress">
+          <intent-filter>
+              <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+          </intent-filter>
+          <meta-data
+              android:name="android.appwidget.provider"
+              android:resource="@xml/year_progress_widget_info" />
+      </receiver>
+
     </application>
 </manifest>
+

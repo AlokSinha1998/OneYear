@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">OneYear</string>
+    <string name="widget_description">Track year progress on your home screen</string>
 </resources>

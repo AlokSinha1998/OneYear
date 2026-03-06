@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="12dp"
+    android:gravity="center_vertical">
+
+    <!-- App name -->
+    <TextView
+        android:id="@+id/widget_app_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OneYear"
+        android:textColor="#80FFFFFF"
+        android:textSize="10sp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.12"
+        android:textAllCaps="true" />
+
+    <!-- Year -->
+    <TextView
+        android:id="@+id/widget_year"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="2026"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginTop="2dp" />
+
+    <!-- Progress % big number -->
+    <TextView
+        android:id="@+id/widget_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="17.3%"
+        android:textColor="#FFF59E0B"
+        android:textSize="34sp"
+        android:fontFamily="sans-serif-black"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp" />
+
+    <!-- Subtitle -->
+    <TextView
+        android:id="@+id/widget_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="of the year is gone"
+        android:textColor="#AAFFFFFF"
+        android:textSize="11sp" />
+
+    <!-- Progress bar -->
+    <ProgressBar
+        android:id="@+id/widget_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="10dp"
+        android:progressDrawable="@drawable/widget_progress_drawable"
+        android:progress="17"
+        android:max="100" />
+
+    <!-- Day count row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp">
+
+        <TextView
+            android:id="@+id/widget_day_gone"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Day 63"
+            android:textColor="#FFFFFFFF"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium" />
+
+        <TextView
+            android:id="@+id/widget_day_left"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="302 days left"
+            android:textColor="#80FFFFFF"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+
+</LinearLayout>

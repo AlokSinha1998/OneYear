@@ -16,8 +16,12 @@ import {
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
+    useAnimatedScrollHandler,
+    interpolate,
+    Extrapolation,
     withRepeat,
     withTiming,
+    withSpring,
 } from "react-native-reanimated";
 import LinearGradient from "react-native-linear-gradient";
 import { captureRef } from "react-native-view-shot";
@@ -29,8 +33,11 @@ import RateUsModal from "./component/module/RateUsModal";
 import ThemeSelectorModal from "./component/module/ThemeSelectorModal";
 import NotificationSettingsModal from "./component/module/NotificationSettingsModal";
 import GoalEditorModal from "./component/module/GoalEditorModal";
+import CountdownsScreen from "./CountdownsScreen";
+import OnboardingModal from "./component/module/OnboardingModal";
 import { useTheme } from "../context/ThemeContext";
 import { useAppOpenTracker } from "../hooks/useAppOpenTracker";
+import { useOnboarding } from "../hooks/useOnboarding";
 import { useGoals, Goal } from "../hooks/useGoals";
 
 /* ===================== TYPES ===================== */
@@ -78,6 +85,7 @@ const getYearData = (year: number): YearData => {
 type DayDotProps = {
     index: number;
     todayIndex: number | null;
+    year: number;
     size: number;
     colors: [string, string];
     todayColors: [string, string];
@@ -89,6 +97,7 @@ type DayDotProps = {
 const DayDot: React.FC<DayDotProps> = ({
     index,
     todayIndex,
+    year,
     size,
     colors,
     todayColors,
@@ -98,8 +107,11 @@ const DayDot: React.FC<DayDotProps> = ({
 }) => {
     const pulse = useSharedValue<number>(1);
     const isToday = index === todayIndex;
-    const isPast = todayIndex && index < todayIndex;
-    const isFuture = todayIndex && index > todayIndex;
+    // todayIndex is null when viewing a past or future year
+    const viewingPastYear = todayIndex === null && year < new Date().getFullYear();
+    const viewingFutureYear = todayIndex === null && year > new Date().getFullYear();
+    const isPast = viewingPastYear || (todayIndex !== null && index < todayIndex);
+    const isFuture = viewingFutureYear || (todayIndex !== null && index > todayIndex);
 
     const bubble1Scale = useSharedValue<number>(0);
     const bubble1Opacity = useSharedValue<number>(0);
@@ -226,17 +238,65 @@ const YearProgressScreenMulColor: React.FC = () => {
     const [menuVisible, setMenuVisible] = useState(false);
     const [themeModalVisible, setThemeModalVisible] = useState(false);
     const [notifModalVisible, setNotifModalVisible] = useState(false);
+    const [countdownsVisible, setCountdownsVisible] = useState(false);
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
     const [dayModalVisible, setDayModalVisible] = useState(false);
     const [goalEditorVisible, setGoalEditorVisible] = useState(false);
     const [goalEditorDay, setGoalEditorDay] = useState<number | null>(null);
 
     const { shouldShowRatePrompt, markAsRated, dismissPrompt } = useAppOpenTracker();
+    const { showTutorial, completeTutorial } = useOnboarding();
     const { goals, addGoal, removeGoal, getGoalForDay, reloadForYear } = useGoals(year);
 
     const headerHeight = 150;
     const availableWidth = width - 32;
     const availableHeight = height - headerHeight - 20;
+
+    // ── Twitter-style scroll animation ──
+    const COLLAPSE_THRESHOLD = 60; // px scrolled before header starts hiding
+    const scrollY = useSharedValue(0);
+    const lastScrollY = useSharedValue(0);
+    const headerTranslate = useSharedValue(0); // 0=visible, -headerHeight=hidden
+
+    const scrollHandler = useAnimatedScrollHandler({
+        onScroll: (event) => {
+            const y = event.contentOffset.y;
+            const diff = y - lastScrollY.value;
+            lastScrollY.value = y;
+            scrollY.value = y;
+
+            if (y <= 10) {
+                // At very top — always show header
+                headerTranslate.value = withSpring(0, { damping: 20, stiffness: 200 });
+            } else if (diff > 0) {
+                // Scrolling DOWN — collapse header
+                headerTranslate.value = withSpring(
+                    Math.max(-headerHeight, headerTranslate.value - diff * 1.2),
+                    { damping: 20, stiffness: 200 }
+                );
+            } else {
+                // Scrolling UP — reveal header
+                headerTranslate.value = withSpring(
+                    Math.min(0, headerTranslate.value - diff * 1.2),
+                    { damping: 20, stiffness: 200 }
+                );
+            }
+        },
+    });
+
+    const animatedHeaderStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: headerTranslate.value }],
+        opacity: interpolate(headerTranslate.value, [-headerHeight, 0], [0, 1], Extrapolation.CLAMP),
+    }));
+
+    // Compact floating pill that appears when header is hidden
+    const animatedPillStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(headerTranslate.value, [-headerHeight * 0.5, -headerHeight * 0.15], [1, 0], Extrapolation.CLAMP),
+        transform: [{
+            translateY: interpolate(headerTranslate.value, [-headerHeight, 0], [0, -20], Extrapolation.CLAMP),
+        }],
+        pointerEvents: headerTranslate.value < -headerHeight * 0.3 ? 'auto' : 'none',
+    }));
 
     const { columns, dotSize } = React.useMemo(() => {
         let bestCols = 10;
@@ -314,66 +374,79 @@ const YearProgressScreenMulColor: React.FC = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* TOP BAR */}
-            <View style={[styles.topBar, { width: width * 0.95 }]}>
-                {/* Menu Button */}
-                <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
-                    <Text style={[styles.menuIcon, { color: theme.headerText }]}>☰</Text>
-                </TouchableOpacity>
 
-                {/* Header: date + progress */}
-                <View style={styles.headerCenter}>
-                    <Text style={[styles.date, { color: theme.headerText }]}>
-                        {new Date().toDateString().toUpperCase()}
-                    </Text>
-                    {data.todayIndex !== null && (
-                        <Text style={[styles.progress, { color: theme.subText }]}>
-                            {data.gonePercent}% gone • {data.leftPercent}% left
+            {/* ── ANIMATED HEADER ── */}
+            <Animated.View style={[styles.headerWrapper, { width }, animatedHeaderStyle]}>
+                {/* TOP BAR */}
+                <View style={[styles.topBar, { width: width * 0.95 }]}>
+                    <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
+                        <Text style={[styles.menuIcon, { color: theme.headerText }]}>☰</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.headerCenter}>
+                        <Text style={[styles.date, { color: theme.headerText }]}>
+                            {new Date().toDateString().toUpperCase()}
                         </Text>
+                        {data.todayIndex !== null && (
+                            <Text style={[styles.progress, { color: theme.subText }]}>
+                                {data.gonePercent}% gone • {data.leftPercent}% left
+                            </Text>
+                        )}
+                    </View>
+
+                    <ThreeDLoaderWithModal />
+                </View>
+
+                {/* YEAR SWITCHER */}
+                <View style={styles.yearSwitcher}>
+                    <TouchableOpacity style={styles.yearArrow} onPress={() => setYear(y => y - 1)}>
+                        <Text style={[styles.yearArrowText, { color: theme.headerText }]}>‹</Text>
+                    </TouchableOpacity>
+
+                    <Text style={[styles.yearText, { color: theme.headerText }]}>{year}</Text>
+
+                    <TouchableOpacity
+                        style={styles.yearArrow}
+                        onPress={() => setYear(y => y + 1)}
+                        disabled={year >= currentYear + 1}
+                    >
+                        <Text style={[
+                            styles.yearArrowText,
+                            { color: year >= currentYear + 1 ? 'rgba(255,255,255,0.2)' : theme.headerText },
+                        ]}>›</Text>
+                    </TouchableOpacity>
+
+                    {year !== currentYear && (
+                        <TouchableOpacity style={styles.todayBadge} onPress={() => setYear(currentYear)}>
+                            <Text style={styles.todayBadgeText}>Today</Text>
+                        </TouchableOpacity>
                     )}
                 </View>
 
-                <ThreeDLoaderWithModal />
-            </View>
+                <DayProgressBar />
+            </Animated.View>
 
-            {/* YEAR SWITCHER */}
-            <View style={styles.yearSwitcher}>
+            {/* ── COMPACT FLOATING PILL (shows when header hidden) ── */}
+            <Animated.View style={[styles.floatingPill, animatedPillStyle]} pointerEvents="none">
                 <TouchableOpacity
-                    style={styles.yearArrow}
-                    onPress={() => setYear(y => y - 1)}
+                    style={[styles.floatingPillInner, { backgroundColor: theme.menuBg }]}
+                    onPress={() => setMenuVisible(true)}
                 >
-                    <Text style={[styles.yearArrowText, { color: theme.headerText }]}>‹</Text>
+                    <Text style={[styles.floatingPillText, { color: theme.menuText }]}>
+                        {year}  •  {data.gonePercent ?? 0}%
+                    </Text>
                 </TouchableOpacity>
-
-                <Text style={[styles.yearText, { color: theme.headerText }]}>{year}</Text>
-
-                <TouchableOpacity
-                    style={styles.yearArrow}
-                    onPress={() => setYear(y => y + 1)}
-                    disabled={year >= currentYear + 1}
-                >
-                    <Text style={[
-                        styles.yearArrowText,
-                        { color: year >= currentYear + 1 ? 'rgba(255,255,255,0.2)' : theme.headerText },
-                    ]}>›</Text>
-                </TouchableOpacity>
-
-                {year !== currentYear && (
-                    <TouchableOpacity
-                        style={styles.todayBadge}
-                        onPress={() => setYear(currentYear)}
-                    >
-                        <Text style={styles.todayBadgeText}>Today</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            <DayProgressBar />
+            </Animated.View>
 
             {/* GRID */}
-            <ScrollView
+            <Animated.ScrollView
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.grid}
+                contentContainerStyle={[styles.grid, { paddingTop: headerHeight + 16 }]}
+                decelerationRate="fast"
+                overScrollMode="never"
+                bounces
             >
                 <View ref={gridRef} style={styles.dotsContainer}>
                     {Array.from({ length: data.totalDays }, (_, i) => i + 1).map(item => (
@@ -381,6 +454,7 @@ const YearProgressScreenMulColor: React.FC = () => {
                             key={item}
                             index={item}
                             todayIndex={data.todayIndex}
+                            year={year}
                             size={dotSize}
                             colors={getDotColors(item)}
                             todayColors={theme.todayDot}
@@ -390,17 +464,21 @@ const YearProgressScreenMulColor: React.FC = () => {
                         />
                     ))}
                 </View>
-            </ScrollView>
+            </Animated.ScrollView>
 
             {/* ── MENU MODAL ── */}
             <Modal
-                animationType="fade"
+                animationType="slide"
                 transparent
                 visible={menuVisible}
                 onRequestClose={() => setMenuVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: theme.menuBg }]}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.menuBg, maxHeight: height * 0.5 }]}>
+                        {/* Fixed drag handle */}
+                        <View style={styles.modalHandle} />
+
+                        {/* Fixed header */}
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, { color: theme.menuText }]}>Menu</Text>
                             <TouchableOpacity onPress={() => setMenuVisible(false)}>
@@ -410,59 +488,72 @@ const YearProgressScreenMulColor: React.FC = () => {
 
                         <View style={styles.separator} />
 
-                        {/* Actions */}
-                        <MenuAction
-                            icon="🎨" label="Change Theme" sub="Customise dot colors"
-                            bg="#f0ebff"
-                            onPress={() => { setMenuVisible(false); setThemeModalVisible(true); }}
-                            textColor={theme.menuText}
-                        />
-                        <MenuAction
-                            icon="📤" label="Share My Progress" sub="Send to friends"
-                            bg="#e3f2fd"
-                            onPress={handleShare}
-                            textColor={theme.menuText}
-                        />
-                        <MenuAction
-                            icon="🔔" label="Daily Reminder" sub="Get daily progress nudges"
-                            bg="#fff8e1"
-                            onPress={() => { setMenuVisible(false); setNotifModalVisible(true); }}
-                            textColor={theme.menuText}
-                        />
-                        <MenuAction
-                            icon="🎯" label="My Milestones" sub="Long-press any dot to add"
-                            bg="#fce4ec"
-                            onPress={() => { setMenuVisible(false); }}
-                            textColor={theme.menuText}
-                        />
+                        {/* Scrollable content */}
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            bounces={false}
+                            contentContainerStyle={{ paddingBottom: 16 }}
+                        >
+                            {/* Actions */}
+                            <MenuAction
+                                icon="🎨" label="Change Theme" sub="Customise dot colors"
+                                bg="#f0ebff"
+                                onPress={() => { setMenuVisible(false); setThemeModalVisible(true); }}
+                                textColor={theme.menuText}
+                            />
+                            <MenuAction
+                                icon="📤" label="Share My Progress" sub="Send to friends"
+                                bg="#e3f2fd"
+                                onPress={handleShare}
+                                textColor={theme.menuText}
+                            />
+                            <MenuAction
+                                icon="🔔" label="Daily Reminder" sub="Get daily progress nudges"
+                                bg="#fff8e1"
+                                onPress={() => { setMenuVisible(false); setNotifModalVisible(true); }}
+                                textColor={theme.menuText}
+                            />
+                            <MenuAction
+                                icon="🎯" label="My Milestones" sub="Long-press any dot to add"
+                                bg="#fce4ec"
+                                onPress={() => { setMenuVisible(false); }}
+                                textColor={theme.menuText}
+                            />
+                            <MenuAction
+                                icon="⏳" label="Countdowns" sub="Track upcoming events"
+                                bg="#e8f4fd"
+                                onPress={() => { setMenuVisible(false); setCountdownsVisible(true); }}
+                                textColor={theme.menuText}
+                            />
 
-                        <View style={[styles.separator, { marginVertical: 10 }]} />
-                        <Text style={[styles.sectionTitle, { color: theme.menuText }]}>More Apps from Us</Text>
+                            <View style={[styles.separator, { marginVertical: 10 }]} />
+                            <Text style={[styles.sectionTitle, { color: theme.menuText }]}>More Apps from Us</Text>
 
-                        <MenuAction
-                            icon="🎨" label="Drawing Pad" sub="Unleash your creativity"
-                            bg="#e8f5e9"
-                            onPress={() => Linking.openURL('https://play.google.com/store/apps/details?id=com.drawingpad')}
-                            textColor={theme.menuText}
-                        />
-                        <MenuAction
-                            icon="🎮" label="Flip Flop Game" sub="Fun memory puzzle game"
-                            bg="#fff3e0"
-                            onPress={() => Linking.openURL('https://play.google.com/store/apps/details?id=com.flipflopgame')}
-                            textColor={theme.menuText}
-                        />
-                        <MenuAction
-                            icon="🏛️" label="My Citizen Services" sub="Citizen services app"
-                            bg="#fff3e0"
-                            onPress={() => Linking.openURL('https://play.google.com/store/apps/details?id=com.mycitizenservices')}
-                            textColor={theme.menuText}
-                        />
-                        <MenuAction
-                            icon="ℹ️" label="About Us" sub="Learn more about our team"
-                            bg="#E0F7FA"
-                            onPress={() => Linking.openURL('https://sites.google.com/view/privacypolicyoneyear/home')}
-                            textColor={theme.menuText}
-                        />
+                            <MenuAction
+                                icon="🎨" label="Drawing Pad" sub="Unleash your creativity"
+                                bg="#e8f5e9"
+                                onPress={() => Linking.openURL('https://play.google.com/store/apps/details?id=com.drawingpad')}
+                                textColor={theme.menuText}
+                            />
+                            <MenuAction
+                                icon="🎮" label="Flip Flop Game" sub="Fun memory puzzle game"
+                                bg="#fff3e0"
+                                onPress={() => Linking.openURL('https://play.google.com/store/apps/details?id=com.flipflopgame')}
+                                textColor={theme.menuText}
+                            />
+                            <MenuAction
+                                icon="🏛️" label="My Citizen Services" sub="Citizen services app"
+                                bg="#fff3e0"
+                                onPress={() => Linking.openURL('https://play.google.com/store/apps/details?id=com.mycitizenservices')}
+                                textColor={theme.menuText}
+                            />
+                            <MenuAction
+                                icon="ℹ️" label="About Us" sub="Learn more about our team"
+                                bg="#E0F7FA"
+                                onPress={() => Linking.openURL('https://sites.google.com/view/privacypolicyoneyear/home')}
+                                textColor={theme.menuText}
+                            />
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -496,10 +587,20 @@ const YearProgressScreenMulColor: React.FC = () => {
                 onClose={() => setGoalEditorVisible(false)}
             />
 
+            <CountdownsScreen
+                visible={countdownsVisible}
+                onClose={() => setCountdownsVisible(false)}
+            />
+
             <RateUsModal
                 visible={shouldShowRatePrompt}
                 onRate={markAsRated}
                 onDismiss={dismissPrompt}
+            />
+
+            <OnboardingModal
+                visible={showTutorial}
+                onDone={completeTutorial}
             />
         </View>
     );
@@ -534,6 +635,33 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         alignItems: 'center',
+    },
+    headerWrapper: {
+        position: 'absolute',
+        top: 0,
+        zIndex: 10,
+        alignItems: 'center',
+    },
+    floatingPill: {
+        position: 'absolute',
+        top: 12,
+        alignSelf: 'center',
+        zIndex: 20,
+    },
+    floatingPillInner: {
+        paddingHorizontal: 18,
+        paddingVertical: 8,
+        borderRadius: 50,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    floatingPillText: {
+        fontSize: 14,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     topBar: {
         flexDirection: 'row',
@@ -616,7 +744,15 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         padding: 20,
-        minHeight: 300,
+        paddingBottom: 0,
+    },
+    modalHandle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#ccc',
+        alignSelf: 'center',
+        marginBottom: 12,
     },
     modalHeader: {
         flexDirection: 'row',
